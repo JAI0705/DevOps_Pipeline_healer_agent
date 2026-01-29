@@ -5,7 +5,9 @@ annotated-types==0.7.0
 anyio==4.12.1
 attrs==25.4.0
 certifi==2026.1.4
+cffi==2.0.0
 charset-normalizer==3.4.4
+cryptography==46.0.4
 dataclasses-json==0.6.7
 distro==1.9.0
 frozenlist==1.8.0
@@ -37,9 +39,13 @@ orjson==3.11.5
 ormsgpack==1.12.2
 packaging==25.0
 propcache==0.4.1
+pycparser==3.0
 pydantic==2.12.5
 pydantic-settings==2.12.0
 pydantic_core==2.41.5
+PyGithub==2.8.1
+PyJWT==2.10.1
+PyNaCl==1.6.2
 python-dotenv==1.2.1
 PyYAML==6.0.3
 requests==2.32.5
