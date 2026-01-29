@@ -1,0 +1,15 @@
+pipeline-healer/
+├── .env                      # Your secrets
+├── agent/
+│   ├── __init__.py
+│   ├── graph.py             # LangGraph workflow
+│   └── state.py             # State schema
+├── tools/
+│   ├── __init__.py
+│   ├── github_tools.py      # Fetch logs, create PRs
+│   └── code_fixer.py        # Generate fixes
+├── examples/
+│   ├── broken_workflow.yml  # Example failing workflow
+│   └── buggy_script.py      # Example buggy code
+├── main.py                  # Entry point
+└── README.md
