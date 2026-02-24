@@ -4,49 +4,54 @@
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![LangGraph](https://img.shields.io/badge/LangGraph-1.0+-green.svg)
-![LangChain](https://img.shields.io/badge/LangChain-1.2+-orange.svg)
+![Groq](https://img.shields.io/badge/Groq-Llama_3.3_70B-orange.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688.svg)
+![Tests](https://img.shields.io/badge/Tests-38_passing-brightgreen.svg)
 ![License](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-**An intelligent AI-powered agent that automatically detects, analyzes, and fixes failed GitHub Actions pipelines**
+**An AI-powered agent that automatically detects, analyzes, and fixes failed GitHub Actions pipelines**
 
-[Getting Started](#-getting-started) • [How It Works](#-how-it-works) • [Architecture](#-architecture) • [Examples](#-sample-flows)
+[Use as GitHub Action](#-use-as-a-github-action) • [Run Locally](#-run-locally-cli) • [API Server](#-api-server) • [Architecture](#-architecture) • [Contributing](#-contributing)
 
 </div>
 
 ---
 
-## 🎯 Overview
+## 🎯 What Does It Do?
 
-Pipeline Healer Agent is a sophisticated DevOps automation tool that leverages **LangGraph** and **Groq LLM** to autonomously heal broken CI/CD pipelines. When your GitHub Actions workflow fails, this agent:
+When your GitHub Actions workflow fails, Pipeline Healer **automatically**:
 
-1. **Fetches** the error logs from the failed workflow run
-2. **Analyzes** the root cause using AI (identifies error type, affected files, and issue details)
-3. **Generates** an intelligent fix for the problematic code
-4. **Applies** the fix to a new branch
-5. **Creates** a pull request for human review
+1. 📥 **Fetches** error logs from the failed run
+2. 🔍 **Analyzes** the root cause using AI (syntax error? missing dependency? bad config?)
+3. 🔧 **Generates** an intelligent code fix
+4. 🌿 **Creates** a new branch with the fix
+5. 📝 **Opens** a pull request for your review
 
-This enables rapid self-healing pipelines while maintaining human oversight through the PR review process.
+You review the PR, merge if it looks good. **That's it — self-healing pipelines.**
 
 ---
 
 ## 🚀 Use as a GitHub Action
 
-The **easiest way** to use Pipeline Healer is as a GitHub Action in your own repos.
+The **easiest way** to use Pipeline Healer — add one workflow file and your repo heals itself.
 
-### Quick Setup (3 steps)
+### Quick Setup (3 Steps)
 
-**Step 1:** Add your Groq API key as a repository secret:
+**Step 1:** Get a free Groq API key at [console.groq.com](https://console.groq.com)
 
-> Repo → Settings → Secrets and variables → Actions → New repository secret → Name: `GROQ_API_KEY`
+**Step 2:** Add it as a repo secret:
 
-**Step 2:** Create `.github/workflows/auto-heal.yml` in your repo:
+> **Repo → Settings → Secrets and variables → Actions → New repository secret**
+> Name: `GROQ_API_KEY` | Value: your key
+
+**Step 3:** Create `.github/workflows/auto-heal.yml` in your repo:
 
 ```yaml
 name: 🔧 Auto-Heal Pipeline
 
 on:
   workflow_run:
-    workflows: ["*"]
+    workflows: ["*"] # Watches all your workflows
     types: [completed]
 
 jobs:
@@ -60,7 +65,7 @@ jobs:
     steps:
       - name: 🔧 Run Pipeline Healer
         id: healer
-        uses: JAI0705/Pipeline-Healer-agent@v1
+        uses: JAI0705/DevOps_Pipeline_healer_agent@v1
         with:
           groq-api-key: ${{ secrets.GROQ_API_KEY }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -68,22 +73,24 @@ jobs:
       - name: 📋 Summary
         if: steps.healer.outputs.success == 'true'
         run: |
-          echo "✅ PR: ${{ steps.healer.outputs.pr-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "## ✅ Pipeline Auto-Healed!" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** ${{ steps.healer.outputs.pr-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Analysis:** ${{ steps.healer.outputs.error-analysis }}" >> $GITHUB_STEP_SUMMARY
 ```
 
-**Step 3:** Push it. That's it! Any future workflow failures will automatically trigger the healer.
+Push this file. **Done!** Every future pipeline failure triggers the healer automatically.
 
-### Inputs
+### Action Inputs
 
-| Input          | Required | Default                   | Description                       |
-| -------------- | -------- | ------------------------- | --------------------------------- |
-| `groq-api-key` | ✅       |                           | Your Groq API key                 |
-| `github-token` | ✅       | `${{ github.token }}`     | GitHub token with `repo` scope    |
-| `run-id`       | ❌       | Auto-detected from event  | Specific workflow run ID to heal  |
-| `repo`         | ❌       | Auto-detected from event  | Repository in `owner/repo` format |
-| `llm-model`    | ❌       | `llama-3.3-70b-versatile` | Groq LLM model to use             |
+| Input          | Required | Default                   | Description                            |
+| -------------- | -------- | ------------------------- | -------------------------------------- |
+| `groq-api-key` | ✅       |                           | Your Groq API key                      |
+| `github-token` | ✅       | `${{ github.token }}`     | GitHub token (auto-provided by GitHub) |
+| `run-id`       | ❌       | Auto-detected from event  | Specific workflow run ID to heal       |
+| `repo`         | ❌       | Auto-detected from event  | Repository in `owner/repo` format      |
+| `llm-model`    | ❌       | `llama-3.3-70b-versatile` | Groq LLM model to use                  |
 
-### Outputs
+### Action Outputs
 
 | Output           | Description                                |
 | ---------------- | ------------------------------------------ |
@@ -94,16 +101,141 @@ jobs:
 
 ---
 
-## ✨ Key Features
+## 💻 Run Locally (CLI)
 
-| Feature                           | Description                                                                                         |
-| --------------------------------- | --------------------------------------------------------------------------------------------------- |
-| 🔍 **Intelligent Error Analysis** | Uses Groq's Llama 3.3 70B model to understand error types (syntax, dependency, configuration, etc.) |
-| 🔄 **Automated Fix Generation**   | Generates complete code fixes based on error analysis and file context                              |
-| 🌿 **Branch Management**          | Automatically creates timestamped branches (`auto-fix-{timestamp}`) for fixes                       |
-| 📝 **Pull Request Creation**      | Creates detailed PRs with error analysis, fix explanation, and affected files                       |
-| 🛡️ **Safe Automation**            | All changes require human review before merging to main                                             |
-| 📊 **State-Based Workflow**       | Uses LangGraph for reliable, trackable workflow execution                                           |
+For manual use or development:
+
+### Prerequisites
+
+- **Python 3.10+**
+- **Groq API Key** — free at [console.groq.com](https://console.groq.com)
+- **GitHub Token** — with `repo` scope ([generate here](https://github.com/settings/tokens))
+
+### Installation
+
+```bash
+git clone https://github.com/JAI0705/DevOps_Pipeline_healer_agent.git
+cd DevOps_Pipeline_healer_agent
+
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+pip install -r requirements.txt
+```
+
+### Configure
+
+```bash
+cp .env.example .env
+# Edit .env with your actual API keys
+```
+
+### Run
+
+```bash
+python main.py
+```
+
+```
+🚀 Pipeline Healer Agent Starting...
+============================================================
+Enter your repository (format: username/repo-name):
+> myusername/my-project
+
+Enter the failed workflow run ID:
+> 12345678901
+
+============================================================
+📥 Fetching logs from GitHub...
+🔍 Analyzing error...
+🔧 Generating fix...
+✍️ Applying fix to new branch...
+📝 Creating pull request...
+
+============================================================
+✅ HEALING COMPLETE!
+============================================================
+Pull Request: https://github.com/myusername/my-project/pull/42
+Branch: auto-fix-1706799315
+```
+
+> 💡 **Finding the Run ID:** Go to your repo → Actions tab → click the failed run → copy the ID from the URL: `github.com/user/repo/actions/runs/[THIS_NUMBER]`
+
+---
+
+## 🌐 API Server
+
+Run Pipeline Healer as a REST API for programmatic access and webhook-based automation.
+
+### Start the Server
+
+```bash
+pip install fastapi uvicorn
+uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### Endpoints
+
+| Method | Endpoint           | Description                                  |
+| ------ | ------------------ | -------------------------------------------- |
+| POST   | `/heal`            | Trigger a healing job (runs in background)   |
+| GET    | `/status/{job_id}` | Check the status of a healing job            |
+| GET    | `/health`          | Health check                                 |
+| GET    | `/history`         | View recent healing jobs                     |
+| POST   | `/webhook/github`  | Receive GitHub webhook events (auto-trigger) |
+| GET    | `/docs`            | Interactive Swagger UI documentation         |
+
+### Example: Trigger Healing via API
+
+```bash
+curl -X POST http://localhost:8000/heal \
+  -H "Content-Type: application/json" \
+  -d '{"repo_name": "myusername/my-project", "run_id": "12345678901"}'
+```
+
+Response:
+
+```json
+{
+  "job_id": "a1b2c3d4",
+  "status": "queued",
+  "message": "Healing job queued for myusername/my-project"
+}
+```
+
+```bash
+# Check status
+curl http://localhost:8000/status/a1b2c3d4
+```
+
+### GitHub Webhooks (Auto-Trigger)
+
+Set up a webhook so the API server **auto-heals** any failed workflow:
+
+1. Go to your repo → **Settings → Webhooks → Add webhook**
+2. **Payload URL:** `https://your-server/webhook/github`
+3. **Content type:** `application/json`
+4. **Secret:** set `GITHUB_WEBHOOK_SECRET` in your `.env`
+5. **Events:** select **Workflow runs**
+
+---
+
+## 🐳 Docker
+
+### Quick Start
+
+```bash
+docker compose up --build
+```
+
+The API server runs at `http://localhost:8000`.
+
+### Build Manually
+
+```bash
+docker build -t pipeline-healer .
+docker run -p 8000:8000 --env-file .env pipeline-healer
+```
 
 ---
 
@@ -116,300 +248,206 @@ graph LR
     A[Start] --> B[Fetch Logs]
     B --> C[Analyze Error]
     C --> D[Generate Fix]
-    D --> E[Apply Fix]
-    E --> F[Create PR]
-    F --> G[End]
+    D --> E[Validate Fix]
+    E --> F[Apply Fix]
+    F --> G[Create PR]
+    G --> H[End]
 
     style A fill:#e1f5fe
-    style G fill:#c8e6c9
+    style H fill:#c8e6c9
     style B fill:#fff9c4
     style C fill:#fff9c4
     style D fill:#fff9c4
-    style E fill:#fff9c4
+    style E fill:#ffe0b2
     style F fill:#fff9c4
+    style G fill:#fff9c4
 ```
 
-### Workflow Nodes
+### How Each Step Works
 
-| Node            | Description                                                  |
-| --------------- | ------------------------------------------------------------ |
-| `fetch_logs`    | Retrieves error logs from the failed GitHub Actions run      |
-| `analyze_error` | Uses LLM to identify error type, failed file, and root cause |
-| `generate_fix`  | Generates corrected code based on error analysis             |
-| `apply_fix`     | Creates a new branch and commits the fix                     |
-| `create_pr`     | Opens a pull request with detailed fix documentation         |
+| Node            | What It Does                                                         |
+| --------------- | -------------------------------------------------------------------- |
+| `fetch_logs`    | Calls GitHub API to get error logs from the failed workflow run      |
+| `analyze_error` | Sends logs to LLM → returns error type, failed file, root cause      |
+| `generate_fix`  | Fetches the broken file, sends to LLM with context → gets fixed code |
+| `validate_fix`  | Checks syntax (Python AST, YAML, JSON) and scores fix confidence     |
+| `apply_fix`     | Creates a timestamped branch and commits the corrected file          |
+| `create_pr`     | Opens a PR with error analysis, fix explanation, and affected files  |
+
+### Production Features
+
+- **Retry logic** — LLM and GitHub API calls use exponential backoff (tenacity)
+- **Structured logging** — JSON logs with timestamps, step tracking, correlation IDs
+- **Input validation** — Repo name format, run ID, env vars checked before workflow starts
+- **Custom exceptions** — `HealingError`, `GitHubAPIError`, `LLMError`, `ValidationError`
+- **Fix validation** — Syntax checking (Python/YAML/JSON) + confidence scoring before applying
 
 ---
 
 ## 📂 Project Structure
 
 ```
-pipeline-healer/
-├── .env                      # Environment variables (API keys)
-├── main.py                   # Entry point - CLI interface
-├── agent/
-│   ├── __init__.py
-│   ├── graph.py              # LangGraph workflow definition
-│   └── state.py              # State schema (PipelineHealingState)
-├── tools/
-│   ├── __init__.py
-│   ├── github_tools.py       # GitHub API integration tools
-│   └── code_fixer.py         # Code fix generation utilities
-├── sample_flows/             # Learning examples
-│   ├── simple_agent.py       # Basic LLM agent example
-│   ├── agent_with_memory.py  # Agent with conversation memory
-│   ├── agent_with_tool.py    # Agent with file management tools
-│   └── simple_graph.py       # Basic LangGraph workflow example
-├── examples/                 # Example failing code for testing
-├── requirements.txt          # Python dependencies
-└── README.md
+DevOps_Pipeline_healer_agent/
+├── action.yml                    # GitHub Action definition
+├── action_entrypoint.py          # GitHub Action entry point
+├── Dockerfile                    # Production Docker image
+├── Dockerfile.action             # GitHub Action Docker image
+├── docker-compose.yml            # Local development with Docker
+├── main.py                       # CLI entry point
+├── pyproject.toml                # Project metadata & tool configs
+├── requirements.txt              # Production dependencies
+├── requirements-dev.txt          # Dev dependencies (pytest, ruff, etc.)
+├── .env.example                  # Environment variable template
+│
+├── agent/                        # Core healing workflow
+│   ├── graph.py                  # LangGraph 5-node pipeline
+│   └── state.py                  # PipelineHealingState schema
+│
+├── tools/                        # LangChain tools
+│   ├── github_tools.py           # GitHub API (logs, branches, PRs)
+│   └── code_fixer.py             # Fix validation & confidence scoring
+│
+├── api/                          # REST API & webhooks
+│   ├── server.py                 # FastAPI application
+│   ├── webhooks.py               # GitHub webhook handler
+│   └── models.py                 # Pydantic request/response models
+│
+├── config/
+│   └── settings.py               # Centralized Pydantic settings
+│
+├── utils/                        # Shared utilities
+│   ├── exceptions.py             # Custom exception hierarchy
+│   ├── validators.py             # Input validation
+│   └── logger.py                 # Structured logging
+│
+├── tests/                        # Test suite (38 tests)
+│   ├── conftest.py               # Fixtures & auto-mocked env vars
+│   ├── test_graph.py             # Workflow node tests
+│   ├── test_github_tools.py      # GitHub tools tests
+│   ├── test_validators.py        # Validation tests
+│   └── mocks/                    # Mock GitHub API & LLM responses
+│
+├── examples/                     # Example files
+│   ├── usage-workflow.yml        # Copy-paste GitHub Action workflow
+│   ├── buggy_script.py           # Example buggy Python file
+│   └── broken_workflow.yml       # Example broken CI workflow
+│
+├── sample_flows/                 # Educational examples
+│   ├── simple_agent.py           # Basic LLM agent
+│   ├── agent_with_memory.py      # Agent with conversation memory
+│   ├── agent_with_tool.py        # Agent with custom tools
+│   └── simple_graph.py           # Basic LangGraph workflow
+│
+└── .github/workflows/
+    └── ci.yml                    # CI pipeline (lint + test + Docker)
 ```
 
 ---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Python 3.10+**
-- **GitHub Account** with a Personal Access Token
-- **Groq API Key** (free tier available at [console.groq.com](https://console.groq.com))
-
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/yourusername/Pipeline-Healer-agent.git
-   cd Pipeline-Healer-agent
-   ```
-
-2. **Create and activate a virtual environment**
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Configure environment variables**
-
-   Create a `.env` file in the project root:
-
-   ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   GITHUB_TOKEN=your_github_personal_access_token_here
-   ```
-
-   > ⚠️ **Important**: Your GitHub token needs `repo` scope permissions for full repository access (reading files, creating branches, and opening PRs).
-
-### Usage
-
-Run the healer agent:
+## 🧪 Testing
 
 ```bash
-python main.py
+# Install dev dependencies
+pip install -r requirements-dev.txt
+
+# Run all tests
+python -m pytest tests/ -v
+
+# Run with coverage
+python -m pytest tests/ -v --cov=. --cov-report=term-missing
+
+# Lint
+ruff check .
 ```
 
-You'll be prompted to enter:
+**38 tests** covering:
 
-1. **Repository name** in format `username/repo-name`
-2. **Workflow run ID** (found in the GitHub Actions URL)
-
-**Example:**
-
-```
-🚀 Pipeline Healer Agent Starting...
-============================================================
-Enter your repository (format: username/repo-name):
-> myusername/my-failing-project
-
-Enter the failed workflow run ID:
-(You can find this in the GitHub Actions URL)
-> 12345678901
-
-Repository: myusername/my-failing-project
-Run ID: 12345678901
-============================================================
-📥 Fetching logs from GitHub...
-🔍 Analyzing error...
-🔧 Generating fix...
-✍️ Applying fix to new branch...
-📝 Creating pull request...
-
-============================================================
-✅ HEALING COMPLETE!
-============================================================
-Pull Request: https://github.com/myusername/my-failing-project/pull/42
-Branch: auto-fix-1706799315
-```
-
-### Finding the Workflow Run ID
-
-1. Go to your repository on GitHub
-2. Click on the **Actions** tab
-3. Click on the failed workflow run
-4. Copy the run ID from the URL: `https://github.com/user/repo/actions/runs/[RUN_ID]`
+- ✅ Input validation (repo names, run IDs, env vars)
+- ✅ GitHub API tools (log fetching, file reading, PR creation, branch creation)
+- ✅ Workflow nodes (each node tested independently with mocked LLM & GitHub API)
+- ✅ Error handling (API failures, invalid LLM responses, missing data)
 
 ---
 
-## 🔧 GitHub Tools
+## ⚙️ Configuration
 
-The agent provides several pre-built tools for GitHub interaction:
+All settings can be configured via environment variables or `.env`:
 
-| Tool                            | Description                                                                    |
-| ------------------------------- | ------------------------------------------------------------------------------ |
-| `get_workflow_run_logs`         | Fetches logs from a specific workflow run, filtering for failed jobs and steps |
-| `get_file_content`              | Retrieves file content from any branch in the repository                       |
-| `create_branch_and_update_file` | Creates a new branch from default and commits a file update                    |
-| `create_pull_request`           | Opens a PR with customizable title, body, and branch targets                   |
-| `list_recent_workflow_runs`     | Lists recent workflow runs with their status and conclusions                   |
+```env
+# Required
+GROQ_API_KEY=your_groq_api_key
+GITHUB_TOKEN=your_github_token
 
----
-
-## 📚 Sample Flows
-
-The `sample_flows/` directory contains educational examples to help you understand the underlying concepts:
-
-### 1. Simple Agent (`simple_agent.py`)
-
-Basic example of using Groq LLM to analyze error logs.
-
-```bash
-python sample_flows/simple_agent.py
-```
-
-### 2. Agent with Memory (`agent_with_memory.py`)
-
-Demonstrates conversation memory for multi-turn interactions.
-
-```bash
-python sample_flows/agent_with_memory.py
-```
-
-### 3. Agent with Tools (`agent_with_tool.py`)
-
-Shows how to create agents with custom file management tools.
-
-```bash
-python sample_flows/agent_with_tool.py
-```
-
-### 4. Simple Graph (`simple_graph.py`)
-
-Illustrates basic LangGraph workflow concepts with a two-step error analysis pipeline.
-
-```bash
-python sample_flows/simple_graph.py
-```
-
----
-
-## 🔌 API Reference
-
-### PipelineHealingState
-
-The state object that flows through the healing workflow:
-
-```python
-class PipelineHealingState(TypedDict):
-    # Input
-    repo_name: str          # e.g., "username/pipeline-test"
-    run_id: str             # Workflow run ID
-
-    # Processing
-    error_logs: str         # Raw error logs from GitHub
-    failed_file: str        # Which file caused the error
-    error_analysis: str     # AI's understanding of the error
-
-    # Fix generation
-    proposed_fix: str       # The corrected code
-    fix_explanation: str    # Why this fix should work
-
-    # Execution
-    branch_name: str        # Branch created with fix
-    pr_url: Optional[str]   # Pull request URL
-
-    # Status tracking
-    current_step: str       # Current step in workflow
-    success: bool           # Did we successfully fix it?
-```
-
-### heal_pipeline Function
-
-```python
-def heal_pipeline(repo_name: str, run_id: str) -> dict:
-    """
-    Main function to heal a failed pipeline.
-
-    Args:
-        repo_name: GitHub repo in format 'owner/repo'
-        run_id: The workflow run ID that failed
-
-    Returns:
-        Final state dict with PR URL, branch name, and fix details
-    """
+# Optional
+LLM_MODEL=llama-3.3-70b-versatile
+LLM_TEMPERATURE=0.0
+MAX_RETRIES=3
+LOG_LEVEL=INFO
+LOG_JSON=false                    # Set to true for production JSON logs
+DEFAULT_BASE_BRANCH=main
+BRANCH_PREFIX=auto-fix
+GITHUB_WEBHOOK_SECRET=your_secret # For webhook signature verification
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Technology                                                      | Purpose                                    |
-| --------------------------------------------------------------- | ------------------------------------------ |
-| **[LangGraph](https://github.com/langchain-ai/langgraph)**      | State graph orchestration for AI workflows |
-| **[LangChain](https://langchain.com)**                          | LLM integration and prompt management      |
-| **[Groq](https://groq.com)**                                    | Ultra-fast LLM inference (Llama 3.3 70B)   |
-| **[PyGithub](https://pygithub.readthedocs.io)**                 | GitHub API integration                     |
-| **[python-dotenv](https://github.com/theskumar/python-dotenv)** | Environment variable management            |
+| Technology                                                 | Purpose                                       |
+| ---------------------------------------------------------- | --------------------------------------------- |
+| **[LangGraph](https://github.com/langchain-ai/langgraph)** | State graph orchestration for the AI workflow |
+| **[LangChain](https://langchain.com)**                     | LLM integration and tool framework            |
+| **[Groq](https://groq.com)**                               | Ultra-fast LLM inference (Llama 3.3 70B)      |
+| **[FastAPI](https://fastapi.tiangolo.com)**                | REST API server with auto-generated docs      |
+| **[PyGithub](https://pygithub.readthedocs.io)**            | GitHub API integration                        |
+| **[Pydantic](https://docs.pydantic.dev)**                  | Settings management & data validation         |
+| **[Tenacity](https://tenacity.readthedocs.io)**            | Retry logic with exponential backoff          |
+| **[Docker](https://docker.com)**                           | Containerization & deployment                 |
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+Contributions are welcome! Here's how:
 
 1. **Fork** the repository
 2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
+3. **Run tests** (`python -m pytest tests/ -v`)
+4. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+5. **Push** to the branch (`git push origin feature/amazing-feature`)
+6. **Open** a Pull Request
 
 ### Ideas for Contributions
 
-- [ ] Add support for more CI/CD platforms (GitLab CI, Jenkins, CircleCI)
-- [ ] Implement retry logic with exponential backoff
-- [ ] Add Slack/Discord notifications for healing events
-- [ ] Create a web dashboard for monitoring healed pipelines
-- [ ] Support for multi-file fixes
-- [ ] Add test coverage for the healing workflow
+- [ ] Add support for GitLab CI / Jenkins / CircleCI
+- [ ] Multi-file fix support (batch fixes into single PR)
+- [ ] Slack / Discord notifications for healing events
+- [ ] Smart caching of similar error patterns
+- [ ] Web dashboard for monitoring healed pipelines
+- [ ] Fix pattern learning (remember what worked before)
 
 ---
 
 ## ⚠️ Limitations
 
-- Currently supports GitHub Actions only
-- Single-file fixes only (multi-file support planned)
-- Requires public repository or PAT with appropriate scopes
-- LLM-generated fixes should always be reviewed before merging
+- Currently supports **GitHub Actions only** (multi-platform planned)
+- **Single-file fixes** only (multi-file support planned)
+- Requires a **Groq API key** (free tier available)
+- LLM-generated fixes should **always be reviewed** before merging
+- The `GITHUB_TOKEN` provided by Actions has limited permissions — for private repos, use a PAT with `repo` scope
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- [LangChain](https://langchain.com) for the amazing AI framework
-- [Groq](https://groq.com) for lightning-fast inference
+- [LangChain](https://langchain.com) & [LangGraph](https://github.com/langchain-ai/langgraph) for the AI workflow framework
+- [Groq](https://groq.com) for lightning-fast LLM inference
 - The open-source community for continuous inspiration
 
 ---
@@ -419,5 +457,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Made with ❤️ for DevOps Engineers everywhere**
 
 _Star ⭐ this repo if you found it helpful!_
+
+[Report Bug](https://github.com/JAI0705/DevOps_Pipeline_healer_agent/issues) · [Request Feature](https://github.com/JAI0705/DevOps_Pipeline_healer_agent/issues) · [Discussions](https://github.com/JAI0705/DevOps_Pipeline_healer_agent/discussions)
 
 </div>
