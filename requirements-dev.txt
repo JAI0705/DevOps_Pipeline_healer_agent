@@ -1,0 +1,13 @@
+# Development dependencies for Pipeline Healer Agent
+
+# Testing
+pytest==8.3.5
+pytest-cov==6.1.1
+pytest-asyncio==0.25.3
+
+# Linting & Formatting
+ruff==0.9.10
+black==25.1.0
+
+# Type checking
+mypy==1.15.0

@@ -1,0 +1,39 @@
+# examples/broken_workflow.yml
+# This GitHub Actions workflow intentionally contains common errors
+# for testing the Pipeline Healer Agent.
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # BUG: typo in requirements file name
+      - name: Install dependencies
+        run: pip install -r requirments.txt
+
+      # BUG: incorrect test command
+      - name: Run tests
+        run: pytset --cov=.
+
+      # BUG: referencing undefined env variable
+      - name: Deploy
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Deploying version ${{ env.APP_VERSION }}"
+          curl -X POST ${{ secrets.DEPLOY_URL }} \
+            -H "Authorization: Bearer ${{ secrets.DEPLOY_TOKN }}"

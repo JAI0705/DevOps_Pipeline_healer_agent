@@ -1,10 +1,22 @@
 # tools/github_tools.py
 
+"""
+GitHub API integration tools for the Pipeline Healer Agent.
+
+Provides LangChain tools for fetching workflow logs, reading files,
+creating branches, and opening pull requests.
+"""
+
 import base64
 import os
 
 from github import Github, GithubException
 from langchain_core.tools import tool
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from utils.logger import get_logger
+
+logger = get_logger("tools.github")
 
 # Initialize GitHub client
 github_token = os.getenv("GITHUB_TOKEN")
@@ -12,25 +24,25 @@ g = Github(github_token)
 
 
 @tool
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 def get_workflow_run_logs(repo_name: str, run_id: str) -> str:
     """
     Fetch logs from a failed GitHub Actions workflow run.
 
     Args:
-        repo_name: Repository in format 'owner/repo' (e.g., 'your-username/pipeline-test')
-        run_id: The workflow run ID (number)
+        repo_name: Repository in format 'owner/repo'
+        run_id: The workflow run ID (number from the Actions URL)
 
     Returns:
-        The error logs from the failed run
+        The error logs from the failed run, or an error message
     """
     try:
-        # Get the repository
         repo = g.get_repo(repo_name)
-
-        # Get the specific workflow run
         run = repo.get_workflow_run(int(run_id))
-
-        # Get jobs for this run
         jobs = run.jobs()
 
         logs = []
@@ -40,7 +52,6 @@ def get_workflow_run_logs(repo_name: str, run_id: str) -> str:
                 logs.append(f"JOB: {job.name}")
                 logs.append(f"{'=' * 60}")
 
-                # Get steps
                 for step in job.steps:
                     if step.conclusion == "failure":
                         logs.append(f"\n❌ FAILED STEP: {step.name}")
@@ -52,12 +63,20 @@ def get_workflow_run_logs(repo_name: str, run_id: str) -> str:
         return "\n".join(logs)
 
     except GithubException as e:
-        return f"GitHub API Error: {e.data.get('message', str(e))}"
+        msg = e.data.get("message", str(e)) if hasattr(e, "data") else str(e)
+        logger.error(f"GitHub API error fetching logs: {msg}")
+        return f"GitHub API Error: {msg}"
     except Exception as e:
+        logger.error(f"Error fetching logs: {e}")
         return f"Error fetching logs: {str(e)}"
 
 
 @tool
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 def get_file_content(repo_name: str, file_path: str, branch: str = "main") -> str:
     """
     Get the content of a file from a GitHub repository.
@@ -68,20 +87,21 @@ def get_file_content(repo_name: str, file_path: str, branch: str = "main") -> st
         branch: Branch name (default: main)
 
     Returns:
-        The file content
+        The file content as a string
     """
     try:
         repo = g.get_repo(repo_name)
         file = repo.get_contents(file_path, ref=branch)
 
-        # Decode base64 content
         content = base64.b64decode(file.content).decode("utf-8")
-
         return f"File: {file_path}\n{'=' * 60}\n{content}"
 
     except GithubException as e:
-        return f"Error: {e.data.get('message', 'File not found')}"
+        msg = e.data.get("message", "File not found") if hasattr(e, "data") else str(e)
+        logger.error(f"GitHub API error reading file '{file_path}': {msg}")
+        return f"Error: {msg}"
     except Exception as e:
+        logger.error(f"Error reading file '{file_path}': {e}")
         return f"Error: {str(e)}"
 
 
@@ -95,25 +115,28 @@ def create_pull_request(
     Args:
         repo_name: Repository in format 'owner/repo'
         title: PR title
-        body: PR description
+        body: PR description (markdown)
         head_branch: Branch with the fix
         base_branch: Target branch (default: main)
 
     Returns:
-        URL of the created PR
+        URL of the created PR, or an error message
     """
     try:
         repo = g.get_repo(repo_name)
-        ## Create pull is a build in github function
         pr = repo.create_pull(
             title=title, body=body, head=head_branch, base=base_branch
         )
 
+        logger.info(f"PR created: {pr.html_url}")
         return f"✓ Pull request created: {pr.html_url}"
 
     except GithubException as e:
-        return f"Error creating PR: {e.data.get('message', str(e))}"
+        msg = e.data.get("message", str(e)) if hasattr(e, "data") else str(e)
+        logger.error(f"Error creating PR: {msg}")
+        return f"Error creating PR: {msg}"
     except Exception as e:
+        logger.error(f"Error creating PR: {e}")
         return f"Error: {str(e)}"
 
 
@@ -136,19 +159,20 @@ def create_branch_and_update_file(
         commit_message: Commit message
 
     Returns:
-        Success message with branch name
+        Success message with branch name, or an error message
     """
     try:
         repo = g.get_repo(repo_name)
 
-        # Get default branch
+        # Get default branch SHA
         default_branch = repo.default_branch
         source = repo.get_branch(default_branch)
 
-        # Create new branch
+        # Create new branch from default
         repo.create_git_ref(ref=f"refs/heads/{branch_name}", sha=source.commit.sha)
+        logger.info(f"Created branch '{branch_name}' from '{default_branch}'")
 
-        # Get current file
+        # Get current file SHA for update
         file = repo.get_contents(file_path, ref=default_branch)
 
         # Update file in new branch
@@ -160,11 +184,15 @@ def create_branch_and_update_file(
             branch=branch_name,
         )
 
+        logger.info(f"Updated '{file_path}' on branch '{branch_name}'")
         return f"✓ Created branch '{branch_name}' and updated {file_path}"
 
     except GithubException as e:
-        return f"Error: {e.data.get('message', str(e))}"
+        msg = e.data.get("message", str(e)) if hasattr(e, "data") else str(e)
+        logger.error(f"GitHub API error: {msg}")
+        return f"Error: {msg}"
     except Exception as e:
+        logger.error(f"Error creating branch/updating file: {e}")
         return f"Error: {str(e)}"
 
 
@@ -178,7 +206,7 @@ def list_recent_workflow_runs(repo_name: str, limit: int = 5) -> str:
         limit: Number of runs to return (default: 5)
 
     Returns:
-        List of recent workflow runs with their status
+        Formatted list of recent workflow runs with their status
     """
     try:
         repo = g.get_repo(repo_name)
@@ -195,4 +223,5 @@ def list_recent_workflow_runs(repo_name: str, limit: int = 5) -> str:
         return "\n".join(results) if results else "No workflow runs found"
 
     except Exception as e:
+        logger.error(f"Error listing workflow runs: {e}")
         return f"Error: {str(e)}"

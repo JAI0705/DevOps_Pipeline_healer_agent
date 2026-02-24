@@ -1,0 +1,64 @@
+# ──────────────────────────────────────────────────────────────
+# Pipeline Healer — GitHub Action Definition
+# ──────────────────────────────────────────────────────────────
+# Usage in any repo:
+#
+#   - uses: JAI0705/Pipeline-Healer-agent@v1
+#     with:
+#       groq-api-key: ${{ secrets.GROQ_API_KEY }}
+#       github-token: ${{ secrets.GITHUB_TOKEN }}
+#
+# ──────────────────────────────────────────────────────────────
+
+name: "Pipeline Healer"
+description: "AI-powered agent that automatically analyzes failed GitHub Actions workflows, generates fixes, and opens pull requests."
+author: "JAI0705"
+
+branding:
+  icon: "tool"
+  color: "blue"
+
+inputs:
+  groq-api-key:
+    description: "Groq API key for LLM inference (get one at console.groq.com)"
+    required: true
+
+  github-token:
+    description: "GitHub token with repo scope (usually ${{ secrets.GITHUB_TOKEN }})"
+    required: true
+    default: ${{ github.token }}
+
+  run-id:
+    description: "Workflow run ID to heal (auto-detected from workflow_run event if not set)"
+    required: false
+    default: ""
+
+  repo:
+    description: "Repository in owner/repo format (auto-detected from event if not set)"
+    required: false
+    default: ""
+
+  llm-model:
+    description: "Groq LLM model to use"
+    required: false
+    default: "llama-3.3-70b-versatile"
+
+outputs:
+  pr-url:
+    description: "URL of the created pull request with the fix"
+  branch-name:
+    description: "Name of the branch created with the fix"
+  error-analysis:
+    description: "AI analysis of what caused the failure"
+  success:
+    description: "Whether healing was successful (true/false)"
+
+runs:
+  using: "docker"
+  image: "Dockerfile.action"
+  env:
+    GROQ_API_KEY: ${{ inputs.groq-api-key }}
+    GITHUB_TOKEN: ${{ inputs.github-token }}
+    INPUT_RUN_ID: ${{ inputs.run-id }}
+    INPUT_REPO: ${{ inputs.repo }}
+    INPUT_LLM_MODEL: ${{ inputs.llm-model }}

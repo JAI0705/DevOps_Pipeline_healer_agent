@@ -1,0 +1,48 @@
+# ──────────────────────────────────────────────────────────────
+# Example: Auto-Heal Failed Pipelines
+# ──────────────────────────────────────────────────────────────
+# Copy this file to YOUR repo at:
+#   .github/workflows/auto-heal.yml
+#
+# Then add GROQ_API_KEY to your repo secrets:
+#   Repo → Settings → Secrets → Actions → New repository secret
+# ──────────────────────────────────────────────────────────────
+
+name: 🔧 Auto-Heal Pipeline
+
+# Trigger when ANY workflow run completes
+on:
+  workflow_run:
+    workflows: ["*"] # Watch all workflows (or list specific ones)
+    types: [completed]
+
+jobs:
+  heal:
+    # Only run when a workflow FAILS
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    name: Analyze & Fix
+
+    permissions:
+      contents: write # Needed to create branches
+      pull-requests: write # Needed to create PRs
+
+    steps:
+      - name: 🔧 Run Pipeline Healer
+        id: healer
+        uses: JAI0705/Pipeline-Healer-agent@v1
+        with:
+          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Optional: Post a comment or notification
+      - name: 📋 Summary
+        if: steps.healer.outputs.success == 'true'
+        run: |
+          echo "## ✅ Pipeline Auto-Healed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** ${{ steps.healer.outputs.pr-url }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ steps.healer.outputs.branch-name }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Error Analysis:**" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.healer.outputs.error-analysis }}" >> $GITHUB_STEP_SUMMARY

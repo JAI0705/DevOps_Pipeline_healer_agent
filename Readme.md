@@ -29,6 +29,71 @@ This enables rapid self-healing pipelines while maintaining human oversight thro
 
 ---
 
+## 🚀 Use as a GitHub Action
+
+The **easiest way** to use Pipeline Healer is as a GitHub Action in your own repos.
+
+### Quick Setup (3 steps)
+
+**Step 1:** Add your Groq API key as a repository secret:
+
+> Repo → Settings → Secrets and variables → Actions → New repository secret → Name: `GROQ_API_KEY`
+
+**Step 2:** Create `.github/workflows/auto-heal.yml` in your repo:
+
+```yaml
+name: 🔧 Auto-Heal Pipeline
+
+on:
+  workflow_run:
+    workflows: ["*"]
+    types: [completed]
+
+jobs:
+  heal:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: 🔧 Run Pipeline Healer
+        id: healer
+        uses: JAI0705/Pipeline-Healer-agent@v1
+        with:
+          groq-api-key: ${{ secrets.GROQ_API_KEY }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📋 Summary
+        if: steps.healer.outputs.success == 'true'
+        run: |
+          echo "✅ PR: ${{ steps.healer.outputs.pr-url }}" >> $GITHUB_STEP_SUMMARY
+```
+
+**Step 3:** Push it. That's it! Any future workflow failures will automatically trigger the healer.
+
+### Inputs
+
+| Input          | Required | Default                   | Description                       |
+| -------------- | -------- | ------------------------- | --------------------------------- |
+| `groq-api-key` | ✅       |                           | Your Groq API key                 |
+| `github-token` | ✅       | `${{ github.token }}`     | GitHub token with `repo` scope    |
+| `run-id`       | ❌       | Auto-detected from event  | Specific workflow run ID to heal  |
+| `repo`         | ❌       | Auto-detected from event  | Repository in `owner/repo` format |
+| `llm-model`    | ❌       | `llama-3.3-70b-versatile` | Groq LLM model to use             |
+
+### Outputs
+
+| Output           | Description                                |
+| ---------------- | ------------------------------------------ |
+| `pr-url`         | URL of the created pull request            |
+| `branch-name`    | Name of the fix branch                     |
+| `error-analysis` | AI analysis of what caused the failure     |
+| `success`        | Whether healing succeeded (`true`/`false`) |
+
+---
+
 ## ✨ Key Features
 
 | Feature                           | Description                                                                                         |
